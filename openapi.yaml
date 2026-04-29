@@ -1,0 +1,1365 @@
+openapi: 3.1.0
+info:
+  title: Flight Control API
+  description: |
+    REST API for the **Flight Control System** — a lightweight flight management
+    application for a small airline.
+
+    ## Capabilities
+
+    - **CRUD** — create, read, update, and delete flights
+    - **Search & filter** — list flights filtered by origin, destination, or status with pagination
+    - **Status state machine** — transition flights through a strictly defined lifecycle:
+
+    ```
+    SCHEDULED ──→ DELAYED ──→ DEPARTED ──→ IN_AIR ──→ LANDED
+        │             │
+        ├──→ DEPARTED  ├──→ CANCELLED
+        │
+        └──→ CANCELLED
+    ```
+
+    `CANCELLED` and `LANDED` are **terminal states** — no further transitions are allowed.
+
+    ## Conventions
+
+    | Concern          | Convention                                                    |
+    |------------------|---------------------------------------------------------------|
+    | Identifiers      | UUID v4 for all resource IDs                                  |
+    | Date/Time        | ISO 8601 with UTC offset (`2026-06-15T10:30:00Z`)            |
+    | Field naming     | `snake_case` for all JSON fields                              |
+    | Collections      | Always wrapped: `{ "items": [...], "total_elements": N, … }` |
+    | Errors           | RFC 9457 Problem Detail (`application/problem+json`)          |
+    | Correlation      | `X-Request-ID` header echoed on every response                |
+    | Versioning       | URI-based: `/api/v1/…`                                       |
+
+    ## Business Rules (Quick Reference)
+
+    1. `departure_time` must be in the future at creation time
+    2. `arrival_time` must be strictly after `departure_time`
+    3. `origin` and `destination` must be different IATA codes
+    4. `flight_number` must be globally unique
+    5. Updates (PUT) are only allowed when status is `SCHEDULED` or `DELAYED`
+    6. Deletion (DELETE) is only allowed when status is `SCHEDULED`
+    7. Status transitions must follow the state machine above
+    8. `CANCELLED` and `LANDED` are terminal — no transitions out
+  version: 1.0.0
+  contact:
+    name: Flight Control Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Flights
+    description: |
+      Endpoints for managing the flight lifecycle — from creation through
+      status transitions to deletion. All mutations enforce the business rules
+      described in the API overview.
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+
+  # =========================================================================
+  # Collection: /api/v1/flights
+  # =========================================================================
+  /api/v1/flights:
+
+    # -----------------------------------------------------------------------
+    # GET  /api/v1/flights — List / Search
+    # -----------------------------------------------------------------------
+    get:
+      operationId: listFlights
+      tags: [Flights]
+      summary: List and search flights
+      description: |
+        Returns a **paginated, optionally filtered** list of flights.
+
+        ### Filtering
+
+        All filter parameters are optional and combined with AND logic:
+        - `origin` — exact match on the 3-letter IATA departure airport code
+        - `destination` — exact match on the 3-letter IATA arrival airport code
+        - `status` — exact match on the current flight status enum value
+
+        When no filters are provided, all flights are returned (paginated).
+
+        ### Pagination
+
+        Uses zero-based page indexing. The response includes `page`, `size`,
+        `total_elements`, and `total_pages` metadata so clients can render
+        pagination controls.
+
+        ### Sorting
+
+        Results are sorted by `departure_time` ascending (soonest first) by default.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/RequestId'
+        - name: origin
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+          examples:
+            jfk:
+              value: JFK
+              summary: John F. Kennedy International
+            lhr:
+              value: LHR
+              summary: London Heathrow
+          description: |
+            Filter by origin airport. Must be a valid 3-letter uppercase IATA code.
+            Case-sensitive — `jfk` will not match.
+        - name: destination
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Z]{3}$'
+          examples:
+            lax:
+              value: LAX
+              summary: Los Angeles International
+            cdg:
+              value: CDG
+              summary: Paris Charles de Gaulle
+          description: |
+            Filter by destination airport. Must be a valid 3-letter uppercase IATA code.
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/FlightStatus'
+          description: |
+            Filter by flight status. Must be one of the defined enum values:
+            `SCHEDULED`, `DELAYED`, `DEPARTED`, `IN_AIR`, `LANDED`, `CANCELLED`.
+      responses:
+        '200':
+          description: |
+            Paginated list of flights matching the filter criteria.
+            Returns an empty `items` array (not 404) when no flights match.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightPage'
+              examples:
+                multiple_flights:
+                  summary: Page with two flights
+                  value:
+                    items:
+                      - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        flight_number: "UA456"
+                        airline: "United Airlines"
+                        origin: "JFK"
+                        destination: "LAX"
+                        departure_time: "2026-06-15T10:30:00Z"
+                        arrival_time: "2026-06-15T16:45:00Z"
+                        status: "SCHEDULED"
+                        created_at: "2026-04-01T09:00:00Z"
+                        updated_at: "2026-04-01T09:00:00Z"
+                      - id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                        flight_number: "BA789"
+                        airline: "British Airways"
+                        origin: "LHR"
+                        destination: "CDG"
+                        departure_time: "2026-06-16T08:00:00Z"
+                        arrival_time: "2026-06-16T09:15:00Z"
+                        status: "SCHEDULED"
+                        created_at: "2026-04-02T14:30:00Z"
+                        updated_at: "2026-04-02T14:30:00Z"
+                    page: 0
+                    size: 20
+                    total_elements: 2
+                    total_pages: 1
+                empty_results:
+                  summary: No flights match the filter
+                  value:
+                    items: []
+                    page: 0
+                    size: 20
+                    total_elements: 0
+                    total_pages: 0
+
+    # -----------------------------------------------------------------------
+    # POST /api/v1/flights — Create
+    # -----------------------------------------------------------------------
+    post:
+      operationId: createFlight
+      tags: [Flights]
+      summary: Create a new flight
+      description: |
+        Creates a new flight with status `SCHEDULED`.
+
+        ### Validation Rules
+
+        The following constraints are enforced (see Business Rules 1–4):
+
+        | Field            | Rule                                                         |
+        |------------------|--------------------------------------------------------------|
+        | `flight_number`  | Must match `^[A-Z]{2}\d{3,4}$` and be unique across all flights |
+        | `airline`        | Required, 1–100 characters                                   |
+        | `origin`         | Must be a valid 3-letter IATA code (`^[A-Z]{3}$`)           |
+        | `destination`    | Must be a valid 3-letter IATA code, **different from origin** |
+        | `departure_time` | Must be a future ISO 8601 datetime                           |
+        | `arrival_time`   | Must be strictly after `departure_time`                       |
+
+        ### Server-Managed Fields
+
+        The following fields are set automatically and must **not** be included in the request:
+        - `id` — generated UUID v4
+        - `status` — always starts as `SCHEDULED`
+        - `created_at` / `updated_at` — set to current server time
+
+        ### Error Scenarios
+
+        | Status | Condition                                  |
+        |--------|--------------------------------------------|
+        | 400    | Missing required fields, invalid format    |
+        | 409    | `flight_number` already exists             |
+        | 422    | origin = destination, departure in past, arrival ≤ departure |
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        description: Flight details. All fields are required.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlightRequest'
+            examples:
+              domestic_flight:
+                summary: Domestic US flight
+                value:
+                  flight_number: "UA456"
+                  airline: "United Airlines"
+                  origin: "JFK"
+                  destination: "LAX"
+                  departure_time: "2026-06-15T10:30:00Z"
+                  arrival_time: "2026-06-15T16:45:00Z"
+              short_haul_europe:
+                summary: Short-haul European flight
+                value:
+                  flight_number: "BA789"
+                  airline: "British Airways"
+                  origin: "LHR"
+                  destination: "CDG"
+                  departure_time: "2026-06-16T08:00:00Z"
+                  arrival_time: "2026-06-16T09:15:00Z"
+      responses:
+        '201':
+          description: |
+            Flight created successfully. The response includes the full flight
+            representation with server-generated fields (`id`, `status`, timestamps).
+            The `Location` header contains the URI for the newly created resource.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+                examples:
+                  - "/api/v1/flights/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+              description: Absolute URI of the created flight resource
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightResponse'
+              examples:
+                created_flight:
+                  summary: Successfully created flight
+                  value:
+                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    flight_number: "UA456"
+                    airline: "United Airlines"
+                    origin: "JFK"
+                    destination: "LAX"
+                    departure_time: "2026-06-15T10:30:00Z"
+                    arrival_time: "2026-06-15T16:45:00Z"
+                    status: "SCHEDULED"
+                    created_at: "2026-04-04T12:00:00Z"
+                    updated_at: "2026-04-04T12:00:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # =========================================================================
+  # Single resource: /api/v1/flights/{flight_id}
+  # =========================================================================
+  /api/v1/flights/{flight_id}:
+    parameters:
+      - $ref: '#/components/parameters/FlightId'
+      - $ref: '#/components/parameters/RequestId'
+
+    # -----------------------------------------------------------------------
+    # GET  /api/v1/flights/{flight_id} — Read
+    # -----------------------------------------------------------------------
+    get:
+      operationId: getFlight
+      tags: [Flights]
+      summary: Get flight details
+      description: |
+        Returns the full representation of a single flight identified by its UUID.
+        Returns 404 if the flight does not exist.
+      responses:
+        '200':
+          description: Flight details retrieved successfully.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightResponse'
+              examples:
+                scheduled_flight:
+                  summary: A scheduled flight
+                  value:
+                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    flight_number: "UA456"
+                    airline: "United Airlines"
+                    origin: "JFK"
+                    destination: "LAX"
+                    departure_time: "2026-06-15T10:30:00Z"
+                    arrival_time: "2026-06-15T16:45:00Z"
+                    status: "SCHEDULED"
+                    created_at: "2026-04-01T09:00:00Z"
+                    updated_at: "2026-04-01T09:00:00Z"
+                delayed_flight:
+                  summary: A delayed flight
+                  value:
+                    id: "c3d4e5f6-a7b8-9012-cdef-234567890123"
+                    flight_number: "LH101"
+                    airline: "Lufthansa"
+                    origin: "FRA"
+                    destination: "MUC"
+                    departure_time: "2026-06-14T14:00:00Z"
+                    arrival_time: "2026-06-14T15:10:00Z"
+                    status: "DELAYED"
+                    created_at: "2026-03-28T10:00:00Z"
+                    updated_at: "2026-04-03T18:45:00Z"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    # -----------------------------------------------------------------------
+    # PUT  /api/v1/flights/{flight_id} — Full Update
+    # -----------------------------------------------------------------------
+    put:
+      operationId: updateFlight
+      tags: [Flights]
+      summary: Update flight details
+      description: |
+        Performs a **full replacement** of the flight's mutable fields.
+        All fields in the request body are required (this is PUT, not PATCH).
+
+        ### Preconditions (Business Rule 5)
+
+        Updates are **only allowed** when the flight status is:
+        - `SCHEDULED`
+        - `DELAYED`
+
+        Attempting to update a flight in any other status (`DEPARTED`, `IN_AIR`,
+        `LANDED`, `CANCELLED`) returns **409 Conflict**.
+
+        ### Validation
+
+        The same validation rules as `POST /api/v1/flights` apply. Additionally:
+        - The `flight_number` uniqueness check excludes the flight being updated
+          (i.e., you can keep the same flight number).
+
+        ### Unchanged Fields
+
+        - `id` — immutable, cannot be changed
+        - `status` — use the `PATCH /status` endpoint instead
+        - `created_at` — immutable
+        - `updated_at` — automatically refreshed to current server time
+
+        ### Error Scenarios
+
+        | Status | Condition                                              |
+        |--------|--------------------------------------------------------|
+        | 400    | Missing required fields, invalid format                |
+        | 404    | Flight with given UUID does not exist                  |
+        | 409    | Flight status is not SCHEDULED or DELAYED; or duplicate flight_number |
+        | 422    | origin = destination, departure in past, arrival ≤ departure |
+      requestBody:
+        required: true
+        description: Complete flight details for replacement. All fields required.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlightRequest'
+            examples:
+              reschedule_flight:
+                summary: Update departure and arrival times
+                value:
+                  flight_number: "UA456"
+                  airline: "United Airlines"
+                  origin: "JFK"
+                  destination: "LAX"
+                  departure_time: "2026-06-15T12:00:00Z"
+                  arrival_time: "2026-06-15T18:15:00Z"
+      responses:
+        '200':
+          description: |
+            Flight updated successfully. Returns the complete updated representation
+            with `updated_at` refreshed to the current server time.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightResponse'
+              examples:
+                updated_flight:
+                  summary: Flight after update
+                  value:
+                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    flight_number: "UA456"
+                    airline: "United Airlines"
+                    origin: "JFK"
+                    destination: "LAX"
+                    departure_time: "2026-06-15T12:00:00Z"
+                    arrival_time: "2026-06-15T18:15:00Z"
+                    status: "SCHEDULED"
+                    created_at: "2026-04-01T09:00:00Z"
+                    updated_at: "2026-04-04T14:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    # -----------------------------------------------------------------------
+    # DELETE /api/v1/flights/{flight_id} — Delete
+    # -----------------------------------------------------------------------
+    delete:
+      operationId: deleteFlight
+      tags: [Flights]
+      summary: Delete a flight
+      description: |
+        Permanently removes a flight from the system.
+
+        ### Preconditions (Business Rule 6)
+
+        Deletion is **only allowed** when the flight status is `SCHEDULED`.
+        Flights that have progressed beyond `SCHEDULED` (i.e., `DELAYED`, `DEPARTED`,
+        `IN_AIR`, `LANDED`, `CANCELLED`) cannot be deleted — they are kept for
+        historical records.
+
+        ### Error Scenarios
+
+        | Status | Condition                                       |
+        |--------|-------------------------------------------------|
+        | 404    | Flight with given UUID does not exist           |
+        | 409    | Flight status is not `SCHEDULED`                |
+
+        ### Idempotency Note
+
+        A second DELETE on the same resource returns **404**, as the resource
+        no longer exists.
+      responses:
+        '204':
+          description: |
+            Flight deleted successfully. No response body is returned.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # =========================================================================
+  # Sub-resource: /api/v1/flights/{flight_id}/status
+  # =========================================================================
+  /api/v1/flights/{flight_id}/status:
+    parameters:
+      - $ref: '#/components/parameters/FlightId'
+      - $ref: '#/components/parameters/RequestId'
+
+    # -----------------------------------------------------------------------
+    # PATCH /api/v1/flights/{flight_id}/status — Transition
+    # -----------------------------------------------------------------------
+    patch:
+      operationId: transitionFlightStatus
+      tags: [Flights]
+      summary: Transition flight status
+      description: |
+        Advances a flight through its lifecycle by transitioning to a new status.
+        Only valid transitions according to the **state machine** are accepted
+        (Business Rules 7–8).
+
+        ### State Machine
+
+        ```
+        SCHEDULED ──→ DELAYED ──→ DEPARTED ──→ IN_AIR ──→ LANDED
+            │             │
+            ├──→ DEPARTED  ├──→ CANCELLED
+            │
+            └──→ CANCELLED
+        ```
+
+        ### Allowed Transitions
+
+        | Current Status | Allowed Target(s)                    |
+        |----------------|--------------------------------------|
+        | `SCHEDULED`    | `DELAYED`, `DEPARTED`, `CANCELLED`   |
+        | `DELAYED`      | `DEPARTED`, `CANCELLED`              |
+        | `DEPARTED`     | `IN_AIR`                             |
+        | `IN_AIR`       | `LANDED`                             |
+        | `LANDED`       | _(terminal — no transitions)_        |
+        | `CANCELLED`    | _(terminal — no transitions)_        |
+
+        ### Error Scenarios
+
+        | Status | Condition                                                       |
+        |--------|-----------------------------------------------------------------|
+        | 404    | Flight with given UUID does not exist                           |
+        | 409    | Attempted transition is not allowed from the current status     |
+        | 422    | Requested status value is not a valid `FlightStatus` enum value |
+
+        ### Side Effects
+
+        Transitioning status also updates the `updated_at` timestamp.
+      requestBody:
+        required: true
+        description: |
+          The target status to transition to. Must be a valid `FlightStatus` enum value.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusTransitionRequest'
+            examples:
+              schedule_to_delayed:
+                summary: Delay a scheduled flight
+                value:
+                  status: "DELAYED"
+              schedule_to_departed:
+                summary: Depart a scheduled flight
+                value:
+                  status: "DEPARTED"
+              schedule_to_cancelled:
+                summary: Cancel a scheduled flight
+                value:
+                  status: "CANCELLED"
+              delayed_to_departed:
+                summary: Depart a delayed flight
+                value:
+                  status: "DEPARTED"
+              departed_to_in_air:
+                summary: Flight is now airborne
+                value:
+                  status: "IN_AIR"
+              in_air_to_landed:
+                summary: Flight has landed
+                value:
+                  status: "LANDED"
+      responses:
+        '200':
+          description: |
+            Status transitioned successfully. Returns the full flight representation
+            reflecting the new status and updated `updated_at` timestamp.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightResponse'
+              examples:
+                transitioned_to_delayed:
+                  summary: Flight transitioned from SCHEDULED to DELAYED
+                  value:
+                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    flight_number: "UA456"
+                    airline: "United Airlines"
+                    origin: "JFK"
+                    destination: "LAX"
+                    departure_time: "2026-06-15T10:30:00Z"
+                    arrival_time: "2026-06-15T16:45:00Z"
+                    status: "DELAYED"
+                    created_at: "2026-04-01T09:00:00Z"
+                    updated_at: "2026-04-04T15:00:00Z"
+                transitioned_to_landed:
+                  summary: Flight transitioned from IN_AIR to LANDED
+                  value:
+                    id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    flight_number: "UA456"
+                    airline: "United Airlines"
+                    origin: "JFK"
+                    destination: "LAX"
+                    departure_time: "2026-06-15T10:30:00Z"
+                    arrival_time: "2026-06-15T16:45:00Z"
+                    status: "LANDED"
+                    created_at: "2026-04-01T09:00:00Z"
+                    updated_at: "2026-06-15T16:42:00Z"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+# ---------------------------------------------------------------------------
+# Components
+# ---------------------------------------------------------------------------
+components:
+
+  # -------------------------------------------------------------------------
+  # Path & Query Parameters
+  # -------------------------------------------------------------------------
+  parameters:
+    FlightId:
+      name: flight_id
+      in: path
+      required: true
+      description: |
+        The UUID of the flight resource. Must be a valid UUID v4 format.
+        Returns 404 if no flight exists with this identifier.
+      schema:
+        type: string
+        format: uuid
+      examples:
+        valid_uuid:
+          value: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          summary: A valid flight UUID
+
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: |
+        Zero-based page index for pagination. First page is `0`.
+        Defaults to `0` if not provided.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      examples:
+        first_page:
+          value: 0
+          summary: First page (default)
+        second_page:
+          value: 1
+          summary: Second page
+
+    SizeParam:
+      name: size
+      in: query
+      required: false
+      description: |
+        Number of items per page. Must be between 1 and 100 inclusive.
+        Defaults to `20` if not provided. Values above 100 are rejected with 400.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      examples:
+        default_size:
+          value: 20
+          summary: Default page size
+        small_page:
+          value: 5
+          summary: Small page for mobile
+
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: |
+        Client-provided correlation ID for distributed tracing. If not provided,
+        the server generates a UUID and returns it in the response `X-Request-ID` header.
+        Accepts any non-empty string up to 256 characters.
+      schema:
+        type: string
+        maxLength: 256
+      examples:
+        client_provided:
+          value: "req-2026-04-04-abc123"
+          summary: Client-generated correlation ID
+
+  # -------------------------------------------------------------------------
+  # Response Headers
+  # -------------------------------------------------------------------------
+  headers:
+    X-Request-ID:
+      description: |
+        Correlation ID for the request/response pair. If the client sent an
+        `X-Request-ID` request header, this echoes the same value. Otherwise,
+        the server generates a UUID v4. Use this value when reporting issues
+        or correlating logs.
+      required: true
+      schema:
+        type: string
+      examples:
+        echoed:
+          value: "req-2026-04-04-abc123"
+          summary: Echoed client correlation ID
+        generated:
+          value: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          summary: Server-generated UUID
+
+  # -------------------------------------------------------------------------
+  # Schemas
+  # -------------------------------------------------------------------------
+  schemas:
+
+    # -- Enums ---------------------------------------------------------------
+    FlightStatus:
+      type: string
+      description: |
+        The lifecycle status of a flight. Transitions are strictly controlled
+        by the state machine defined in the API overview.
+
+        | Value       | Description                            | Terminal? |
+        |-------------|----------------------------------------|-----------|
+        | SCHEDULED   | Flight is planned and open for changes | No        |
+        | DELAYED     | Flight departure has been delayed      | No        |
+        | DEPARTED    | Flight has left the gate               | No        |
+        | IN_AIR      | Flight is airborne                     | No        |
+        | LANDED      | Flight has arrived at destination       | **Yes**   |
+        | CANCELLED   | Flight has been cancelled              | **Yes**   |
+      enum:
+        - SCHEDULED
+        - DELAYED
+        - DEPARTED
+        - IN_AIR
+        - LANDED
+        - CANCELLED
+
+    # -- Request Schemas -----------------------------------------------------
+    FlightRequest:
+      type: object
+      description: |
+        Payload for creating or updating a flight. All fields are required since
+        PUT semantics imply full replacement. Server-managed fields (`id`, `status`,
+        `created_at`, `updated_at`) must **not** be included.
+      required:
+        - flight_number
+        - airline
+        - origin
+        - destination
+        - departure_time
+        - arrival_time
+      properties:
+        flight_number:
+          type: string
+          pattern: '^[A-Z]{2}\d{3,4}$'
+          minLength: 5
+          maxLength: 6
+          description: |
+            IATA-style flight designator: exactly 2 uppercase letters (airline code)
+            followed by 3 or 4 digits (flight number). Must be unique across all flights
+            in the system (Business Rule 4).
+
+            **Valid examples:** `UA456`, `BA1234`, `LH101`
+            **Invalid examples:** `ua456` (lowercase), `A1234` (1 letter), `UAB12` (letters in number)
+          examples:
+            - "UA456"
+            - "BA1234"
+            - "LH101"
+            - "AF007"
+        airline:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: |
+            Full name of the airline operating the flight.
+            Must be between 1 and 100 characters.
+          examples:
+            - "United Airlines"
+            - "British Airways"
+            - "Lufthansa"
+            - "Air France"
+        origin:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          minLength: 3
+          maxLength: 3
+          description: |
+            IATA airport code for the departure airport. Must be exactly 3 uppercase
+            letters. Must differ from `destination` (Business Rule 3).
+          examples:
+            - "JFK"
+            - "LHR"
+            - "FRA"
+            - "NRT"
+        destination:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          minLength: 3
+          maxLength: 3
+          description: |
+            IATA airport code for the arrival airport. Must be exactly 3 uppercase
+            letters. Must differ from `origin` (Business Rule 3).
+          examples:
+            - "LAX"
+            - "CDG"
+            - "MUC"
+            - "SFO"
+        departure_time:
+          type: string
+          format: date-time
+          description: |
+            Scheduled departure date and time in ISO 8601 format with UTC offset.
+            Must be in the **future** at the time of creation (Business Rule 1).
+            For updates, the same constraint applies — you cannot backdate a departure.
+          examples:
+            - "2026-06-15T10:30:00Z"
+            - "2026-12-25T23:59:00Z"
+            - "2026-07-04T06:00:00+02:00"
+        arrival_time:
+          type: string
+          format: date-time
+          description: |
+            Scheduled arrival date and time in ISO 8601 format with UTC offset.
+            Must be **strictly after** `departure_time` (Business Rule 2).
+            A flight cannot depart and arrive at the same time.
+          examples:
+            - "2026-06-15T16:45:00Z"
+            - "2026-12-26T07:30:00Z"
+            - "2026-07-04T07:10:00+02:00"
+
+    StatusTransitionRequest:
+      type: object
+      description: |
+        Payload for changing a flight's status. The `status` field must contain
+        the **target** status — not the current one. The server validates that
+        the transition from the current status to the target status is allowed
+        per the state machine (Business Rules 7–8).
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/FlightStatus'
+          description: |
+            The target status to transition to. Must be a valid enum value and
+            an allowed transition from the flight's current status.
+
+    # -- Response Schemas ----------------------------------------------------
+    FlightResponse:
+      type: object
+      description: |
+        Full representation of a flight resource. Returned by all successful
+        flight operations (create, read, update, status transition).
+        All fields are always present — no optional fields.
+      required:
+        - id
+        - flight_number
+        - airline
+        - origin
+        - destination
+        - departure_time
+        - arrival_time
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: |
+            Server-generated UUID v4 identifier for the flight.
+            Immutable after creation. Used in all resource URIs.
+          examples:
+            - "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        flight_number:
+          type: string
+          description: |
+            The IATA-style flight designator as provided at creation or last update.
+          examples:
+            - "UA456"
+        airline:
+          type: string
+          description: |
+            Full name of the operating airline.
+          examples:
+            - "United Airlines"
+        origin:
+          type: string
+          description: |
+            IATA airport code for the departure airport.
+          examples:
+            - "JFK"
+        destination:
+          type: string
+          description: |
+            IATA airport code for the arrival airport.
+          examples:
+            - "LAX"
+        departure_time:
+          type: string
+          format: date-time
+          description: |
+            Scheduled departure in ISO 8601 format.
+          examples:
+            - "2026-06-15T10:30:00Z"
+        arrival_time:
+          type: string
+          format: date-time
+          description: |
+            Scheduled arrival in ISO 8601 format.
+          examples:
+            - "2026-06-15T16:45:00Z"
+        status:
+          $ref: '#/components/schemas/FlightStatus'
+          description: |
+            Current lifecycle status of the flight.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: |
+            Timestamp when the flight was created. Set once and never modified.
+            ISO 8601 format in UTC.
+          examples:
+            - "2026-04-01T09:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: |
+            Timestamp of the most recent modification (update, status transition).
+            Automatically refreshed by the server on every write operation.
+            ISO 8601 format in UTC.
+          examples:
+            - "2026-04-04T14:30:00Z"
+
+    FlightPage:
+      type: object
+      description: |
+        Paginated wrapper for a list of flights. Collections are **never** returned
+        as bare arrays — they are always wrapped in this structure to provide
+        pagination metadata.
+      required:
+        - items
+        - page
+        - size
+        - total_elements
+        - total_pages
+      properties:
+        items:
+          type: array
+          description: |
+            The flight records for the current page. May be empty if no results
+            match the filter criteria or the requested page is beyond the last page.
+          items:
+            $ref: '#/components/schemas/FlightResponse'
+        page:
+          type: integer
+          minimum: 0
+          description: |
+            The zero-based index of the current page. Mirrors the `page` query parameter.
+          examples:
+            - 0
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: |
+            The maximum number of items per page. Mirrors the `size` query parameter.
+          examples:
+            - 20
+        total_elements:
+          type: integer
+          format: int64
+          minimum: 0
+          description: |
+            Total number of flights matching the filter criteria across all pages.
+          examples:
+            - 42
+        total_pages:
+          type: integer
+          minimum: 0
+          description: |
+            Total number of pages, calculated as `ceil(total_elements / size)`.
+            Returns 0 when `total_elements` is 0.
+          examples:
+            - 3
+
+    # -- Error Schemas (RFC 9457) --------------------------------------------
+    ProblemDetail:
+      type: object
+      description: |
+        Standard error response following [RFC 9457 — Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457).
+        Every error response from this API uses this structure, regardless of status code.
+        Consumers can rely on a **single parsing strategy** for all errors.
+
+        ### Field Semantics
+
+        - **`type`** — a stable URI identifying the error category (permanent contract)
+        - **`title`** — short, static summary for the error type (same for all occurrences)
+        - **`status`** — HTTP status code (redundant with response status, for convenience)
+        - **`detail`** — dynamic, human-readable explanation specific to *this* occurrence
+        - **`instance`** — the request URI that caused the error
+        - **`timestamp`** — when the error occurred (ISO 8601 UTC)
+        - **`correlation_id`** — echoed `X-Request-ID` for tracing
+        - **`errors`** — field-level validation details (only present on 400/422)
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+        - timestamp
+      properties:
+        type:
+          type: string
+          format: uri
+          description: |
+            A URI reference that identifies the problem type. This is a **stable identifier**
+            (permanent contract) — it will not change within an API version.
+            Clients may use this value for programmatic error handling.
+          examples:
+            - "https://flight-control.example.com/errors/validation-failed"
+            - "https://flight-control.example.com/errors/flight-not-found"
+            - "https://flight-control.example.com/errors/invalid-status-transition"
+            - "https://flight-control.example.com/errors/duplicate-flight-number"
+        title:
+          type: string
+          description: |
+            A short, human-readable summary of the problem type. This value is
+            **static** — every occurrence of the same `type` has the same `title`.
+          examples:
+            - "Validation Failed"
+            - "Flight Not Found"
+            - "Invalid Status Transition"
+            - "Duplicate Flight Number"
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          description: |
+            The HTTP status code. Matches the response's actual status code.
+            Included for convenience when the response body is processed
+            separately from HTTP headers.
+          examples:
+            - 400
+            - 404
+            - 409
+            - 422
+        detail:
+          type: string
+          description: |
+            A human-readable explanation **specific to this occurrence** of the problem.
+            Unlike `title`, this value is dynamic and may differ between occurrences
+            of the same error type.
+          examples:
+            - "The field 'flight_number' must match pattern ^[A-Z]{2}\\d{3,4}$"
+            - "Flight with id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' was not found"
+            - "Cannot transition from LANDED to DEPARTED"
+            - "A flight with number 'UA456' already exists"
+        instance:
+          type: string
+          format: uri-reference
+          description: |
+            The URI of the request that generated this error. Useful for
+            debugging and correlating with server-side logs.
+          examples:
+            - "/api/v1/flights"
+            - "/api/v1/flights/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            - "/api/v1/flights/a1b2c3d4-e5f6-7890-abcd-ef1234567890/status"
+        timestamp:
+          type: string
+          format: date-time
+          description: |
+            The server timestamp when the error occurred, in ISO 8601 UTC format.
+          examples:
+            - "2026-04-04T12:34:56Z"
+        correlation_id:
+          type: string
+          description: |
+            The `X-Request-ID` value (echoed from request header or server-generated).
+            Use this when contacting support or correlating with distributed traces.
+          examples:
+            - "req-2026-04-04-abc123"
+            - "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        errors:
+          type: array
+          description: |
+            Field-level validation errors. **Only present** on 400 (Bad Request)
+            and 422 (Unprocessable Entity) responses. Each entry identifies a specific
+            field that failed validation, with a machine-readable code and human message.
+            Omitted entirely (not an empty array) when there are no field-level errors.
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      description: |
+        Describes a single field-level validation error. Part of the `errors` array
+        in `ProblemDetail`.
+      required:
+        - field
+        - code
+        - message
+      properties:
+        field:
+          type: string
+          description: |
+            The JSON path of the field that caused the error.
+            Uses dot notation for nested fields (e.g., `address.city`).
+            For top-level fields, this is simply the field name.
+          examples:
+            - "flight_number"
+            - "origin"
+            - "departure_time"
+            - "arrival_time"
+        code:
+          type: string
+          description: |
+            A machine-readable, stable error code for programmatic handling.
+            Codes are SCREAMING_SNAKE_CASE and are **permanent contracts** —
+            they will not be renamed within an API version.
+
+            ### Standard Codes
+
+            | Code               | Meaning                                     |
+            |--------------------|---------------------------------------------|
+            | `REQUIRED`         | Field is missing or null                    |
+            | `INVALID_FORMAT`   | Field value does not match expected pattern |
+            | `INVALID_VALUE`    | Field value fails a business constraint     |
+            | `DUPLICATE`        | Field value must be unique but already exists |
+            | `OUT_OF_RANGE`     | Numeric/temporal value outside allowed bounds |
+          examples:
+            - "REQUIRED"
+            - "INVALID_FORMAT"
+            - "INVALID_VALUE"
+            - "DUPLICATE"
+            - "OUT_OF_RANGE"
+        message:
+          type: string
+          description: |
+            A human-readable message describing the validation failure.
+            Intended for display in UI or developer debugging, not for programmatic
+            parsing (use `code` instead).
+          examples:
+            - "Flight number is required"
+            - "Flight number must match pattern: 2 uppercase letters followed by 3-4 digits"
+            - "Origin and destination must be different"
+            - "A flight with this number already exists"
+            - "Departure time must be in the future"
+
+  # -------------------------------------------------------------------------
+  # Reusable Error Responses
+  # -------------------------------------------------------------------------
+  responses:
+    BadRequest:
+      description: |
+        **400 Bad Request** — The request body or parameters failed structural
+        validation. This includes missing required fields, malformed JSON,
+        invalid field formats (e.g., flight_number pattern), and type mismatches.
+
+        The `errors` array in the response body lists each field that failed
+        validation with a machine-readable `code` and human-readable `message`.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            missing_required_field:
+              summary: Missing required field
+              value:
+                type: "https://flight-control.example.com/errors/validation-failed"
+                title: "Validation Failed"
+                status: 400
+                detail: "Request body contains 1 validation error"
+                instance: "/api/v1/flights"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-abc123"
+                errors:
+                  - field: "flight_number"
+                    code: "REQUIRED"
+                    message: "Flight number is required"
+            invalid_format:
+              summary: Invalid field format
+              value:
+                type: "https://flight-control.example.com/errors/validation-failed"
+                title: "Validation Failed"
+                status: 400
+                detail: "Request body contains 2 validation errors"
+                instance: "/api/v1/flights"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-def456"
+                errors:
+                  - field: "flight_number"
+                    code: "INVALID_FORMAT"
+                    message: "Flight number must match pattern: 2 uppercase letters followed by 3-4 digits (e.g. UA456)"
+                  - field: "origin"
+                    code: "INVALID_FORMAT"
+                    message: "Origin must be a 3-letter uppercase IATA airport code"
+
+    NotFound:
+      description: |
+        **404 Not Found** — The requested flight resource does not exist.
+        The `detail` field includes the UUID that was looked up.
+
+        This status is also returned when attempting to DELETE an already-deleted
+        flight (DELETE is not idempotent in this API — a second delete returns 404).
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            flight_not_found:
+              summary: Flight not found by UUID
+              value:
+                type: "https://flight-control.example.com/errors/flight-not-found"
+                title: "Flight Not Found"
+                status: 404
+                detail: "Flight with id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' was not found"
+                instance: "/api/v1/flights/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-ghi789"
+
+    Conflict:
+      description: |
+        **409 Conflict** — The request conflicts with the current state of the
+        resource. Common scenarios:
+
+        - **Duplicate flight number** — attempting to create/update a flight with
+          a `flight_number` that already exists (Business Rule 4)
+        - **Invalid status for update** — attempting to PUT when status is not
+          `SCHEDULED` or `DELAYED` (Business Rule 5)
+        - **Invalid status for delete** — attempting to DELETE when status is not
+          `SCHEDULED` (Business Rule 6)
+        - **Invalid status transition** — attempting a transition not allowed by
+          the state machine (Business Rules 7–8)
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            duplicate_flight_number:
+              summary: Flight number already exists
+              value:
+                type: "https://flight-control.example.com/errors/duplicate-flight-number"
+                title: "Duplicate Flight Number"
+                status: 409
+                detail: "A flight with number 'UA456' already exists"
+                instance: "/api/v1/flights"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-jkl012"
+            invalid_status_transition:
+              summary: Invalid state machine transition
+              value:
+                type: "https://flight-control.example.com/errors/invalid-status-transition"
+                title: "Invalid Status Transition"
+                status: 409
+                detail: "Cannot transition from LANDED to DEPARTED. LANDED is a terminal status."
+                instance: "/api/v1/flights/a1b2c3d4-e5f6-7890-abcd-ef1234567890/status"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-mno345"
+            update_not_allowed:
+              summary: Update not allowed in current status
+              value:
+                type: "https://flight-control.example.com/errors/flight-not-modifiable"
+                title: "Flight Not Modifiable"
+                status: 409
+                detail: "Cannot update flight in status DEPARTED. Updates are only allowed when status is SCHEDULED or DELAYED."
+                instance: "/api/v1/flights/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-pqr678"
+            delete_not_allowed:
+              summary: Delete not allowed in current status
+              value:
+                type: "https://flight-control.example.com/errors/flight-not-deletable"
+                title: "Flight Not Deletable"
+                status: 409
+                detail: "Cannot delete flight in status DELAYED. Deletion is only allowed when status is SCHEDULED."
+                instance: "/api/v1/flights/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-stu901"
+
+    UnprocessableEntity:
+      description: |
+        **422 Unprocessable Entity** — The request is syntactically valid JSON with
+        all required fields present, but the values violate **semantic / business rules**.
+        Common scenarios:
+
+        - `origin` and `destination` are the same airport (Business Rule 3)
+        - `departure_time` is in the past (Business Rule 1)
+        - `arrival_time` is not after `departure_time` (Business Rule 2)
+        - `status` value in a transition request is not a recognized enum value
+
+        The `errors` array provides field-level details.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            same_origin_destination:
+              summary: Origin equals destination
+              value:
+                type: "https://flight-control.example.com/errors/validation-failed"
+                title: "Validation Failed"
+                status: 422
+                detail: "Request body contains 1 validation error"
+                instance: "/api/v1/flights"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-vwx234"
+                errors:
+                  - field: "destination"
+                    code: "INVALID_VALUE"
+                    message: "Origin and destination must be different airports"
+            departure_in_past:
+              summary: Departure time is in the past
+              value:
+                type: "https://flight-control.example.com/errors/validation-failed"
+                title: "Validation Failed"
+                status: 422
+                detail: "Request body contains 1 validation error"
+                instance: "/api/v1/flights"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-yza567"
+                errors:
+                  - field: "departure_time"
+                    code: "OUT_OF_RANGE"
+                    message: "Departure time must be in the future"
+            arrival_before_departure:
+              summary: Arrival time is before departure
+              value:
+                type: "https://flight-control.example.com/errors/validation-failed"
+                title: "Validation Failed"
+                status: 422
+                detail: "Request body contains 1 validation error"
+                instance: "/api/v1/flights"
+                timestamp: "2026-04-04T12:00:00Z"
+                correlation_id: "req-bcd890"
+                errors:
+                  - field: "arrival_time"
+                    code: "OUT_OF_RANGE"
+                    message: "Arrival time must be after departure time"
