@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "mcp__learningGitHubMCP__get_me",
+      "mcp__learningGitHubMCP__list_branches",
+      "mcp__learningGitHubMCP__create_branch",
+      "mcp__learningGitHubMCP__push_files",
+      "mcp__learningGitHubMCP__create_pull_request",
+      "mcp__learningGitHubMCP__list_pull_requests",
+      "mcp__learningGitHubMCP__pull_request_read",
+      "mcp__learningGitHubMCP__pull_request_review_write",
+      "mcp__learningGitHubMCP__update_pull_request",
+      "mcp__learningGitHubMCP__get_file_contents",
+      "mcp__learningGitHubMCP__list_commits",
+      "mcp__learningGitHubMCP__get_commit"
+    ]
+  }
+}
