@@ -28,14 +28,14 @@ Loaded automatically by Claude Code in every conversation.
 
 ## Quality Standards
 
-| Dimension | Expectation |
-|-----------|-------------|
-| **Correctness** | All edge cases, error paths, and boundary conditions are handled and tested |
-| **Readability** | Code reads like well-written prose — intent is clear without needing comments to explain *what* |
-| **Testability** | Every unit of business logic can be tested in isolation without infrastructure |
-| **Safety** | No unvalidated external input reaches business logic or persistence; no sensitive data logged or exposed |
-| **Resilience** | Failures in downstream dependencies are handled gracefully; partial failures do not cascade |
-| **Performance** | Resource usage (memory, threads, connections, I/O) is conscious and bounded |
+| Dimension       | Expectation                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| **Correctness** | All edge cases, error paths, and boundary conditions are handled and tested                              |
+| **Readability** | Code reads like well-written prose — intent is clear without needing comments to explain _what_          |
+| **Testability** | Every unit of business logic can be tested in isolation without infrastructure                           |
+| **Safety**      | No unvalidated external input reaches business logic or persistence; no sensitive data logged or exposed |
+| **Resilience**  | Failures in downstream dependencies are handled gracefully; partial failures do not cascade              |
+| **Performance** | Resource usage (memory, threads, connections, I/O) is conscious and bounded                              |
 
 ---
 

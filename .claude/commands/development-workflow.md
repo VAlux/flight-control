@@ -14,23 +14,23 @@ You are **strictly a coordinator**. Analyze the request, delegate to subagents, 
 
 ## Shared Context Files
 
-| File | Written by | Read by | Purpose |
-|------|-----------|---------|---------|
-| `context/PLAN.md` | planner | All agents | Ordered increments with acceptance criteria |
+| File                  | Written by                   | Read by    | Purpose                                                    |
+| --------------------- | ---------------------------- | ---------- | ---------------------------------------------------------- |
+| `context/PLAN.md`     | planner                      | All agents | Ordered increments with acceptance criteria                |
 | `context/PROGRESS.md` | Updated after each increment | All agents | Actual outcomes — what really exists, not what was planned |
 
 ---
 
 ## Workflow Selection
 
-| Request type | Workflow |
-|---|---|
-| New feature / complex change | planner → (increment loop) → done |
-| Simple, well-defined change | implementation → test-runner |
-| Bug fix | implementation → test-runner |
-| Code review / audit | code-review → implementation (fixes) → test-runner |
-| Refactoring | test-runner (baseline) → refactor → test-runner (verify) → code-review |
-| Ambiguous | Ask the user before proceeding |
+| Request type                 | Workflow                                                               |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| New feature / complex change | planner → (increment loop) → done                                      |
+| Simple, well-defined change  | implementation → test-runner                                           |
+| Bug fix                      | implementation → test-runner                                           |
+| Code review / audit          | code-review → implementation (fixes) → test-runner                     |
+| Refactoring                  | test-runner (baseline) → refactor → test-runner (verify) → code-review |
+| Ambiguous                    | Ask the user before proceeding                                         |
 
 ---
 
@@ -102,6 +102,7 @@ Git committing an increment?      → OK — do this directly after each increme
 ## Subagent Invocation
 
 Use the `Agent` tool with specific agent name. Every invocation must include:
+
 - **Subagent name** — one of: `planner`, `implementation`, `test-runner`, `code-review`, `refactor`
 - **What to do** — specific task (including planner mode if invoking planner)
 - **Where to look** — relevant file paths
@@ -135,6 +136,7 @@ If a gate fails, re-invoke the appropriate subagent with corrective instructions
 ## Communication Format
 
 **Starting:**
+
 ```
 Workflow: [type]
 Request: [description]
@@ -142,12 +144,14 @@ Steps: [agent → purpose, agent → purpose, ...]
 ```
 
 **Progress:**
+
 ```
 Done — [agent]: [what it accomplished]
 Next — invoking [agent] to [purpose]
 ```
 
 **Complete:**
+
 ```
 Workflow Complete
 - [What was accomplished]
@@ -183,13 +187,13 @@ After all quality gates pass for all increments:
 
 ## Error Recovery
 
-| Problem | Recovery |
-|---|---|
-| Subagent didn't follow the plan | Re-invoke with explicit file paths and instructions |
-| Compilation errors | Invoke `implementation` with error output |
-| Tests failing (<=3 retries) | Invoke `test-runner` for analysis → `implementation` for fixes |
-| Tests failing (>3 retries) | Invoke `planner` (Mode 3) to re-scope |
-| Increment coverage gaps | Invoke `implementation` with specific missing items from code review |
-| Plan drift detected | `planner` (Mode 2) adjusts remaining increments |
-| Missing plan | Invoke `planner` first |
-| Quality issues in review | Invoke `implementation` or `refactor`, then re-review |
+| Problem                         | Recovery                                                             |
+| ------------------------------- | -------------------------------------------------------------------- |
+| Subagent didn't follow the plan | Re-invoke with explicit file paths and instructions                  |
+| Compilation errors              | Invoke `implementation` with error output                            |
+| Tests failing (<=3 retries)     | Invoke `test-runner` for analysis → `implementation` for fixes       |
+| Tests failing (>3 retries)      | Invoke `planner` (Mode 3) to re-scope                                |
+| Increment coverage gaps         | Invoke `implementation` with specific missing items from code review |
+| Plan drift detected             | `planner` (Mode 2) adjusts remaining increments                      |
+| Missing plan                    | Invoke `planner` first                                               |
+| Quality issues in review        | Invoke `implementation` or `refactor`, then re-review                |
