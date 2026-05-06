@@ -35,6 +35,9 @@ public final class FlightStateMachine {
      * @throws InvalidStatusTransitionException if the transition is not in the allowed set
      */
     public static void validate(FlightStatus from, FlightStatus to) {
+        if (from == null || to == null) {
+            throw new IllegalArgumentException("Status arguments must not be null");
+        }
         if (!ALLOWED_TRANSITIONS.get(from).contains(to)) {
             throw new InvalidStatusTransitionException(from, to);
         }
@@ -48,6 +51,9 @@ public final class FlightStateMachine {
      * @return unmodifiable, non-null set of allowed next statuses
      */
     public static Set<FlightStatus> allowedTransitions(FlightStatus from) {
+        if (from == null) {
+            throw new IllegalArgumentException("Status must not be null");
+        }
         return Collections.unmodifiableSet(ALLOWED_TRANSITIONS.get(from));
     }
 }
