@@ -1,0 +1,572 @@
+/* =====================================================================
+   CSS Reset / Normalize basics
+   ===================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #111827;
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
+img, svg {
+  display: block;
+  max-width: 100%;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+/* =====================================================================
+   Page Layout — Header Bar
+   ===================================================================== */
+header {
+  background-color: #1e3a5f;
+  color: #ffffff;
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+header .header-icon {
+  font-size: 1.5rem;
+}
+
+/* =====================================================================
+   Main Content Area
+   ===================================================================== */
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+/* =====================================================================
+   Filter Bar (Flexbox, wraps on mobile)
+   ===================================================================== */
+#filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+#filter-form .filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 140px;
+  flex: 1;
+}
+
+#filter-form .filter-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+/* =====================================================================
+   Actions Bar
+   ===================================================================== */
+#actions-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+/* =====================================================================
+   Flight Table — full-width, zebra striping, hover highlight
+   ===================================================================== */
+#table-container {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+#flights-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+#flights-table thead {
+  background-color: #f3f4f6;
+  border-bottom: 2px solid #d1d5db;
+}
+
+#flights-table thead th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+  user-select: none;
+}
+
+#flights-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.1s ease;
+  cursor: pointer;
+}
+
+#flights-table tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+#flights-table tbody tr:hover {
+  background-color: #eff6ff;
+}
+
+#flights-table tbody td {
+  padding: 0.7rem 1rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+#flights-table tbody td:last-child {
+  white-space: nowrap;
+}
+
+#no-flights {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem 1rem;
+  font-size: 0.95rem;
+}
+
+/* =====================================================================
+   Status Badge Chips
+   ===================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2em 0.65em;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-SCHEDULED {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #3b82f6;
+}
+
+.badge-DELAYED {
+  background-color: #fef3c7;
+  color: #b45309;
+  border: 1px solid #f59e0b;
+}
+
+.badge-DEPARTED {
+  background-color: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #8b5cf6;
+}
+
+.badge-IN_AIR {
+  background-color: #ccfbf1;
+  color: #0f766e;
+  border: 1px solid #0d9488;
+}
+
+.badge-LANDED {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #16a34a;
+}
+
+.badge-CANCELLED {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #dc2626;
+}
+
+/* =====================================================================
+   Buttons — primary, secondary, danger, small
+   ===================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #1d4ed8;
+  color: #ffffff;
+  border-color: #1d4ed8;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #1e40af;
+  box-shadow: 0 1px 3px rgba(29, 78, 216, 0.4);
+}
+
+.btn-secondary {
+  background-color: #ffffff;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #f9fafb;
+}
+
+.btn-danger {
+  background-color: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+
+/* =====================================================================
+   Form Styles — labels, inputs, selects, error messages
+   ===================================================================== */
+label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+input[type="text"],
+input[type="datetime-local"],
+select {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #111827;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="datetime-local"]:focus,
+select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+input[type="text"].input-error,
+select.input-error {
+  border-color: #dc2626;
+}
+
+.field-error {
+  font-size: 0.75rem;
+  color: #dc2626;
+  margin-top: 0.2rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.85rem;
+}
+
+.form-row:last-of-type {
+  margin-bottom: 0;
+}
+
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* =====================================================================
+   Modal Overlay — centered card, backdrop
+   ===================================================================== */
+.modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-card {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 1.75rem 2rem;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.modal-card h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  color: #111827;
+}
+
+.modal-card.modal-sm {
+  max-width: 360px;
+}
+
+/* =====================================================================
+   Toast Notifications — bottom-right, slide-in, green/red variants
+   ===================================================================== */
+#toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  min-width: 240px;
+  max-width: 360px;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+  animation: toast-slide-in 0.25s ease forwards;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toast.toast-success {
+  background-color: #16a34a;
+  color: #ffffff;
+}
+
+.toast.toast-error {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.toast.toast-hiding {
+  animation: toast-slide-out 0.25s ease forwards;
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+/* =====================================================================
+   Loading Spinner Overlay — centered, semi-transparent backdrop
+   ===================================================================== */
+.spinner-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.65);
+  z-index: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner-overlay[hidden] {
+  display: none;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid #e5e7eb;
+  border-top-color: #1d4ed8;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =====================================================================
+   Pagination Controls
+   ===================================================================== */
+#pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0 1rem;
+}
+
+.page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #374151;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-btn:hover:not(:disabled) {
+  background-color: #f3f4f6;
+}
+
+.page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.page-btn.active {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* =====================================================================
+   Confirmation Dialog
+   ===================================================================== */
+#confirm-modal .modal-card {
+  text-align: center;
+}
+
+#confirm-modal .confirm-message {
+  font-size: 0.95rem;
+  color: #374151;
+  margin-bottom: 1.5rem;
+}
+
+#confirm-modal .confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+/* =====================================================================
+   Responsive Breakpoints
+   ===================================================================== */
+@media (max-width: 768px) {
+  main {
+    padding: 1rem;
+  }
+
+  #filter-form .filter-group {
+    min-width: 100%;
+  }
+
+  #flights-table {
+    font-size: 0.8rem;
+  }
+
+  #flights-table thead th,
+  #flights-table tbody td {
+    padding: 0.55rem 0.6rem;
+  }
+
+  .modal-card {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  header h1 {
+    font-size: 1rem;
+  }
+}

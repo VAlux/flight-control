@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Control</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ================================================================
+       Header Bar
+       ================================================================ -->
+  <header>
+    <span class="header-icon" aria-hidden="true">✈</span>
+    <h1>Flight Control</h1>
+  </header>
+
+  <!-- ================================================================
+       Main Content
+       ================================================================ -->
+  <main>
+
+    <!-- Filter Bar -->
+    <form id="filter-form" novalidate>
+      <div class="filter-group">
+        <label for="filter-origin">Origin</label>
+        <input
+          type="text"
+          id="filter-origin"
+          name="origin"
+          placeholder="e.g. JFK"
+          maxlength="3"
+          autocomplete="off"
+          style="text-transform: uppercase"
+        >
+      </div>
+
+      <div class="filter-group">
+        <label for="filter-destination">Destination</label>
+        <input
+          type="text"
+          id="filter-destination"
+          name="destination"
+          placeholder="e.g. LAX"
+          maxlength="3"
+          autocomplete="off"
+          style="text-transform: uppercase"
+        >
+      </div>
+
+      <div class="filter-group">
+        <label for="filter-status">Status</label>
+        <select id="filter-status" name="status">
+          <option value="">All Statuses</option>
+          <option value="SCHEDULED">Scheduled</option>
+          <option value="DELAYED">Delayed</option>
+          <option value="DEPARTED">Departed</option>
+          <option value="IN_AIR">In Air</option>
+          <option value="LANDED">Landed</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+      </div>
+
+      <div class="filter-actions">
+        <button type="submit" class="btn btn-primary">Search</button>
+        <button type="button" id="filter-clear-btn" class="btn btn-secondary">Clear</button>
+      </div>
+    </form>
+
+    <!-- Actions Bar -->
+    <div id="actions-bar">
+      <button id="create-btn" class="btn btn-primary">+ Create Flight</button>
+    </div>
+
+    <!-- Flight Table -->
+    <div id="table-container">
+      <table id="flights-table" aria-label="Flights list">
+        <thead>
+          <tr>
+            <th scope="col">Flight No.</th>
+            <th scope="col">Airline</th>
+            <th scope="col">Route</th>
+            <th scope="col">Departure</th>
+            <th scope="col">Arrival</th>
+            <th scope="col">Status</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="flights-body">
+          <!-- Rows injected by index.js -->
+        </tbody>
+      </table>
+      <p id="no-flights" hidden>No flights found.</p>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" role="navigation" aria-label="Pagination"></div>
+
+    <!-- ============================================================
+         Create Flight Modal
+         ============================================================ -->
+    <div id="create-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
+      <div class="modal-card">
+        <h2 id="create-modal-title">Create Flight</h2>
+
+        <form id="create-form" novalidate>
+
+          <div class="form-row">
+            <label for="create-flight-number">Flight Number <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="create-flight-number"
+              name="flight_number"
+              placeholder="e.g. AA123"
+              autocomplete="off"
+              maxlength="6"
+              required
+            >
+            <span class="field-error" id="err-flight-number" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="create-airline">Airline <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="create-airline"
+              name="airline"
+              placeholder="e.g. American Airlines"
+              autocomplete="off"
+              maxlength="100"
+              required
+            >
+            <span class="field-error" id="err-airline" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="create-origin">Origin (IATA) <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="create-origin"
+              name="origin"
+              placeholder="e.g. JFK"
+              autocomplete="off"
+              maxlength="3"
+              required
+              style="text-transform: uppercase"
+            >
+            <span class="field-error" id="err-origin" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="create-destination">Destination (IATA) <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="create-destination"
+              name="destination"
+              placeholder="e.g. LAX"
+              autocomplete="off"
+              maxlength="3"
+              required
+              style="text-transform: uppercase"
+            >
+            <span class="field-error" id="err-destination" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="create-departure-time">Departure Time <span aria-hidden="true">*</span></label>
+            <input
+              type="datetime-local"
+              id="create-departure-time"
+              name="departure_time"
+              required
+            >
+            <span class="field-error" id="err-departure-time" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="create-arrival-time">Arrival Time <span aria-hidden="true">*</span></label>
+            <input
+              type="datetime-local"
+              id="create-arrival-time"
+              name="arrival_time"
+              required
+            >
+            <span class="field-error" id="err-arrival-time" aria-live="polite"></span>
+          </div>
+
+          <div class="form-footer">
+            <button type="button" id="create-cancel-btn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         Confirmation Dialog Modal
+         ============================================================ -->
+    <div id="confirm-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-message">
+      <div class="modal-card modal-sm">
+        <p id="confirm-message" class="confirm-message">Are you sure?</p>
+        <div class="confirm-actions">
+          <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
+          <button id="confirm-ok-btn" class="btn btn-danger">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+    <!-- Loading Spinner -->
+    <div id="spinner" class="spinner-overlay" hidden aria-label="Loading" role="status">
+      <div class="spinner"></div>
+    </div>
+
+  </main>
+
+  <script type="module" src="js/index.js"></script>
+</body>
+</html>

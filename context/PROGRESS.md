@@ -326,3 +326,47 @@
 - Quality: PASS (Critical: 0, High: 0, Medium: 4)
 - Coverage: GAPS FOUND — Step 3 (listFlights) sends no filter parameters; filter specification path is unexercised end-to-end; X-Request-ID not asserted on the Order 12 POST response
 - Recommendation: fix and re-review
+
+---
+
+## 2026-05-07 — Increment 8: Frontend: Flight List Page
+
+- **What was completed:** Full static frontend for the flight list page. Five files created under `src/main/resources/static/`. Backend test suite remains at 134 tests, 0 failures.
+- **Interfaces/methods created:**
+  - `api.js` exports: `fetchFlights(params)`, `getFlight(id)`, `createFlight(data)`, `updateFlight(id, data)`, `deleteFlight(id)`, `transitionStatus(id, status)` — all throw structured `Error` with `error.status` and `error.detail` on non-2xx
+  - `ui.js` exports: `showToast(message, type)`, `showSpinner()`, `hideSpinner()`, `showModal(id)`, `hideModal(id)`, `showConfirm(message)` → `Promise<boolean>`, `renderStatusBadge(status)` → `HTMLSpanElement`, `formatDateTime(isoString)` → `string`
+  - `index.js` — page controller (no exports); wires filter form, create modal, delete confirm, row navigation, pagination
+- **Files created/modified:**
+  - `src/main/resources/static/index.html` — full page with filter bar, flight table, create-modal, confirm-modal, toast container, spinner
+  - `src/main/resources/static/css/styles.css` — CSS reset, layout, filter bar, flight table (zebra + hover), 6 status badge colors, buttons, form styles, modal overlay, toast slide-in animation, spinner overlay, pagination controls, confirm dialog, responsive breakpoints
+  - `src/main/resources/static/js/api.js` — ES6 module; `API_BASE = '/api/v1/flights'`; all six API functions; uniform error extraction from Problem Detail `detail` field
+  - `src/main/resources/static/js/ui.js` — ES6 module; DOM helpers; `showConfirm` uses inline modal with Promise-based resolution
+  - `src/main/resources/static/js/index.js` — ES6 module; page controller
+- **Decisions made:**
+  - All `<script>` tags use `type="module"` for native ES6 import/export.
+  - `showConfirm` uses the `#confirm-modal` DOM element with a Promise so it is non-blocking and styled consistently; falls back to `window.confirm` if the modal structure is absent.
+  - `toIsoOffsetString` helper preserves the local timezone offset when sending `departure_time`/`arrival_time` to the backend (avoids silent UTC coercion that would make future-time validation fail in some timezones).
+  - HTML escaping (`escapeHtml`, `escapeAttr`) applied to all flight data injected via `innerHTML` to prevent XSS.
+  - Client-side form validation mirrors the backend Bean Validation rules (pattern, length, cross-field checks) for fast feedback; the backend is still the authoritative source and all API errors are surfaced via toast.
+  - Status badge CSS uses class names matching FlightStatus enum values exactly (`badge-SCHEDULED`, `badge-IN_AIR`, etc.) so `renderStatusBadge` just concatenates `badge badge-${status}`.
+  - Spring Boot's `WelcomePageHandlerMapping` automatically serves `index.html` as the root page (`/`) — no routing configuration needed.
+- **Tests:** 134 passing (unchanged backend), 0 failures (`./mvnw test` — BUILD SUCCESS). Frontend JS has no backend test coverage (no JS test framework in scope for this increment).
+
+---
+
+## 2026-05-07 — Code Review (Increment 8)
+- Quality: PASS (Critical: 0, High: 0, Medium: 3, Suggestion: 3)
+- Coverage: FULLY COVERED
+- Recommendation: approve — address 3 medium findings before Increment 9 adds the detail page which reuses api.js and ui.js
+
+### Findings
+
+**Medium**
+1. `const window = buildPageWindow(...)` at `js/index.js:154` shadows the global `window` object. Rename to `pageWindow` and update the subsequent `.forEach` call.
+2. `formatDateTime(flight.departure_time)` and `formatDateTime(flight.arrival_time)` are interpolated directly into `tr.innerHTML` at `js/index.js:103–104` without HTML escaping. The fallback path in `formatDateTime` returns the raw `isoString`, which is unescaped. Wrap both with `escapeHtml(formatDateTime(...))`.
+3. Network-level `fetch` failures (`TypeError` for DNS/connection errors) propagate with no `.detail` property. Callers access `err.detail` which is `undefined`; the `|| 'Failed to ...'` fallback saves the UX but the error type is unlabelled. Normalize caught `TypeError` in `apiFetch` to set `error.status = 0` and `error.detail = 'Network error — could not reach the server.'`.
+
+**Suggestion**
+1. `state.totalPages` (`js/index.js:62`) is written in `loadFlights` but never read; `renderPagination` reads `data.total_pages` directly. Remove the dead field or use it.
+2. `formatDateTime` catch block at `js/ui.js:171` is unreachable — `new Date(invalid)` returns an Invalid Date rather than throwing. Replace with an `isNaN(date.getTime())` guard.
+3. Client-side form validation does not check that `departure_time` is in the future; the backend enforces this and returns 422, surfaced via toast. Not broken, but inconsistent with the mirrored-validation approach noted in the implementation decisions.
