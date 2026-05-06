@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindCreateButton();
   bindCreateForm();
   bindModalCloseOnBackdrop();
+  consumePendingToast();
   loadFlights();
 });
 
@@ -421,6 +422,26 @@ function bindModalCloseOnBackdrop() {
       if (e.target === modal) hideModal(id);
     });
   });
+}
+
+// -----------------------------------------------------------------------
+// Cross-page toast (queued via sessionStorage from the detail page)
+// -----------------------------------------------------------------------
+
+/**
+ * Reads and clears a pending toast from sessionStorage, then shows it.
+ * Used by the detail page to surface a toast after navigating back here.
+ */
+function consumePendingToast() {
+  const raw = sessionStorage.getItem('pendingToast');
+  if (!raw) return;
+  sessionStorage.removeItem('pendingToast');
+  try {
+    const { message, type } = JSON.parse(raw);
+    if (message) showToast(message, type || 'success');
+  } catch (_) {
+    // Malformed entry — ignore silently
+  }
 }
 
 // -----------------------------------------------------------------------

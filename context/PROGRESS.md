@@ -14,9 +14,9 @@
 | 4 | DTOs & Mapping | completed |
 | 5 | Service Layer & Business Rules | completed |
 | 6 | REST Controller & Error Handling | completed |
-| 7 | Integration Test | pending |
-| 8 | Frontend: Flight List Page | pending |
-| 9 | Frontend: Flight Detail Page | pending |
+| 7 | Integration Test | completed |
+| 8 | Frontend: Flight List Page | completed |
+| 9 | Frontend: Flight Detail Page | completed |
 
 ---
 
@@ -370,3 +370,53 @@
 1. `state.totalPages` (`js/index.js:62`) is written in `loadFlights` but never read; `renderPagination` reads `data.total_pages` directly. Remove the dead field or use it.
 2. `formatDateTime` catch block at `js/ui.js:171` is unreachable — `new Date(invalid)` returns an Invalid Date rather than throwing. Replace with an `isNaN(date.getTime())` guard.
 3. Client-side form validation does not check that `departure_time` is in the future; the backend enforces this and returns 422, surfaced via toast. Not broken, but inconsistent with the mirrored-validation approach noted in the implementation decisions.
+
+---
+
+## 2026-05-07 — Increment 9: Frontend: Flight Detail Page
+
+- **What was completed:** Full static detail page for an individual flight. Reads `?id=` from the URL, fetches the flight, and renders all sections: info card, status transition buttons, inline edit form, and delete action. All API calls go through the existing `api.js`/`ui.js` modules. Backend test suite remains at 134 tests, 0 failures.
+- **Interfaces/methods created:**
+  - `flight-detail.js` (no exports — page controller only):
+    - `renderDetail(flight)` — populates `#flight-info` dl and sets document title
+    - `renderTransitions(flight)` — renders one `.btn-transition` button per allowed next state; shows `#terminal-msg` when none
+    - `renderEditability(flight)` — shows `#toggle-edit-btn` for SCHEDULED/DELAYED; shows `#delete-btn` for SCHEDULED only
+    - `populateEditForm(flight)` — fills `#edit-form` inputs; converts ISO strings to `datetime-local` format
+    - `renderAll(flight)` — calls all four render functions and reveals `#detail-card`
+    - `handleTransition(newStatus)` — calls `transitionStatus`, re-renders, shows toast
+    - `handleEditSubmit(event)` — validates form, calls `updateFlight`, re-renders, shows toast
+    - `handleDelete()` — calls `showConfirm`, calls `deleteFlight`, queues toast in `sessionStorage`, navigates to `index.html`
+    - `toOffsetDateTime(value)` — converts `datetime-local` value to ISO 8601 offset string
+    - `toDatetimeLocalValue(isoString)` — converts ISO string to `datetime-local` format
+  - `index.js` addition:
+    - `consumePendingToast()` — reads and clears `sessionStorage['pendingToast']`; shows queued toast on list page load after detail-page delete
+- **Files created/modified:**
+  - `src/main/resources/static/flight-detail.html` — new; full page with detail card, edit form, confirm modal, toast container, spinner
+  - `src/main/resources/static/js/flight-detail.js` — new; ES6 module page controller
+  - `src/main/resources/static/css/styles.css` — appended detail-page styles: `.back-link`, `.status-message`, `.detail-section`, `.flight-dl`, `.transition-buttons`, `.btn-transition`, `.terminal-msg`, responsive breakpoints
+  - `src/main/resources/static/js/index.js` — added `consumePendingToast()` call in `DOMContentLoaded` handler and the function itself
+- **Decisions made:**
+  - All user-derived data written via `textContent` or `setText`/`setInputValue` helpers — no `innerHTML` for user data; `innerHTML` only used by `renderStatusBadge` which produces a trusted static span.
+  - `toOffsetDateTime` appends `:00Z` for bare `YYYY-MM-DDThh:mm` values; passes through any string that already has seconds or an offset (defensive for future browser variations).
+  - After a delete the detail page writes a `pendingToast` to `sessionStorage` then navigates to `index.html`. The list page's `consumePendingToast()` reads, clears, and shows the toast — one-shot, no residue.
+  - `ALLOWED_TRANSITIONS` constant is a plain object literal matching the backend `FlightStateMachine` exactly. The server remains the ground truth; a backend 409 on an unexpected transition surfaces as an error toast.
+  - Client-side edit-form validation mirrors the same rules as the create form in `index.js` (pattern, IATA length, origin !== destination). Backend 422/409 errors surface via toast for any rule the client missed.
+- **Tests:** 134 passing (unchanged backend), 0 failures (`./mvnw test` — BUILD SUCCESS). Frontend JS has no backend test coverage (no JS test framework in scope).
+
+---
+
+## 2026-05-07 — Code Review (Increment 9)
+- Quality: FAIL (Critical: 0, High: 1, Medium: 1, Suggestion: 1)
+- Coverage: GAPS FOUND — `toOffsetDateTime` in `flight-detail.js` appends hardcoded `:00Z` (UTC) instead of the local timezone offset; violates the "datetime-local ↔ ISO string conversion correct" acceptance criterion for non-UTC users
+- Recommendation: fix and re-review
+
+### Findings
+
+**High**
+- `toOffsetDateTime` in `src/main/resources/static/js/flight-detail.js` lines 62–64 appends `:00Z` for all bare `YYYY-MM-DDThh:mm` values, hardcoding UTC as the offset. `index.js:toIsoOffsetString` correctly preserves the user's local timezone offset using `Date.getTimezoneOffset()`. Users in non-UTC timezones who edit a flight via the detail page will have their departure/arrival times silently shifted by their UTC offset on every save. Fix: replace `toOffsetDateTime` with the same logic as `toIsoOffsetString` in `index.js`, or extract the shared implementation into `ui.js` and import it in both controllers.
+
+**Medium**
+- `flight-detail.js` lines 270–271 (`handleTransition`): after `renderAll(updated)` already called `renderEditability` which sets the correct hidden state for `#edit-section` and `#toggle-edit-btn`, lines 270–271 redundantly overwrite those same properties. Remove the duplicate assignments to avoid split ownership of that state.
+
+**Suggestion**
+- `nextStatus.replace('_', ' ')` at `flight-detail.js:160` uses the non-global `String.replace`; use `.replaceAll('_', ' ')` for consistency and future-proofing against multi-underscore status names.

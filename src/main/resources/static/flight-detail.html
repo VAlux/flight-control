@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Detail — Flight Control</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ================================================================
+       Header Bar
+       ================================================================ -->
+  <header>
+    <nav>
+      <a href="index.html" class="back-link">← Back to Flights</a>
+    </nav>
+    <h1>Flight Detail</h1>
+  </header>
+
+  <!-- ================================================================
+       Main Content
+       ================================================================ -->
+  <main>
+
+    <!-- Loading state -->
+    <p id="loading-msg" class="status-message">Loading...</p>
+
+    <!-- Error state -->
+    <p id="error-msg" class="status-message status-message-error" hidden></p>
+
+    <!-- ============================================================
+         Detail Card (hidden until flight is loaded)
+         ============================================================ -->
+    <section id="detail-card" hidden>
+
+      <!-- Flight Info -->
+      <div class="detail-section">
+        <h2>Flight Information</h2>
+        <dl id="flight-info" class="flight-dl">
+          <dt>ID</dt>
+          <dd id="info-id"></dd>
+
+          <dt>Flight Number</dt>
+          <dd id="info-flight-number"></dd>
+
+          <dt>Airline</dt>
+          <dd id="info-airline"></dd>
+
+          <dt>Route</dt>
+          <dd id="info-route"></dd>
+
+          <dt>Departure Time</dt>
+          <dd id="info-departure-time"></dd>
+
+          <dt>Arrival Time</dt>
+          <dd id="info-arrival-time"></dd>
+
+          <dt>Status</dt>
+          <dd id="info-status"></dd>
+
+          <dt>Created</dt>
+          <dd id="info-created-at"></dd>
+
+          <dt>Last Updated</dt>
+          <dd id="info-updated-at"></dd>
+        </dl>
+      </div>
+
+      <!-- Status Transitions -->
+      <section id="transitions-section" class="detail-section">
+        <h2>Status Transitions</h2>
+        <div id="transition-buttons" class="transition-buttons"></div>
+        <p id="terminal-msg" class="terminal-msg" hidden>This flight has reached a terminal state.</p>
+      </section>
+
+      <!-- Edit Section (hidden by default) -->
+      <section id="edit-section" class="detail-section" hidden>
+        <h2>Edit Flight</h2>
+        <form id="edit-form" novalidate>
+
+          <div class="form-row">
+            <label for="edit-flight-number">Flight Number <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="edit-flight-number"
+              name="flight_number"
+              placeholder="e.g. AA123"
+              autocomplete="off"
+              maxlength="6"
+              required
+            >
+            <span class="field-error" id="edit-err-flight-number" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="edit-airline">Airline <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="edit-airline"
+              name="airline"
+              placeholder="e.g. American Airlines"
+              autocomplete="off"
+              maxlength="100"
+              required
+            >
+            <span class="field-error" id="edit-err-airline" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="edit-origin">Origin (IATA) <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="edit-origin"
+              name="origin"
+              placeholder="e.g. JFK"
+              autocomplete="off"
+              maxlength="3"
+              required
+              style="text-transform: uppercase"
+            >
+            <span class="field-error" id="edit-err-origin" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="edit-destination">Destination (IATA) <span aria-hidden="true">*</span></label>
+            <input
+              type="text"
+              id="edit-destination"
+              name="destination"
+              placeholder="e.g. LAX"
+              autocomplete="off"
+              maxlength="3"
+              required
+              style="text-transform: uppercase"
+            >
+            <span class="field-error" id="edit-err-destination" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="edit-departure-time">Departure Time <span aria-hidden="true">*</span></label>
+            <input
+              type="datetime-local"
+              id="edit-departure-time"
+              name="departure_time"
+              required
+            >
+            <span class="field-error" id="edit-err-departure-time" aria-live="polite"></span>
+          </div>
+
+          <div class="form-row">
+            <label for="edit-arrival-time">Arrival Time <span aria-hidden="true">*</span></label>
+            <input
+              type="datetime-local"
+              id="edit-arrival-time"
+              name="arrival_time"
+              required
+            >
+            <span class="field-error" id="edit-err-arrival-time" aria-live="polite"></span>
+          </div>
+
+          <div class="form-footer">
+            <button type="button" id="cancel-edit-btn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+
+        </form>
+      </section>
+
+      <!-- Edit toggle button (shown for SCHEDULED/DELAYED) -->
+      <button id="toggle-edit-btn" class="btn btn-secondary" hidden>Edit Flight</button>
+
+      <!-- Delete button (shown for SCHEDULED only) -->
+      <button id="delete-btn" class="btn btn-danger" hidden>Delete Flight</button>
+
+    </section>
+
+    <!-- ============================================================
+         Confirmation Dialog Modal
+         ============================================================ -->
+    <div id="confirm-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-message">
+      <div class="modal-card modal-sm">
+        <p id="confirm-message" class="confirm-message">Are you sure?</p>
+        <div class="confirm-actions">
+          <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
+          <button id="confirm-ok-btn" class="btn btn-danger">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+    <!-- Loading Spinner -->
+    <div id="spinner" class="spinner-overlay" hidden aria-label="Loading" role="status">
+      <div class="spinner"></div>
+    </div>
+
+  </main>
+
+  <script type="module" src="js/flight-detail.js"></script>
+</body>
+</html>

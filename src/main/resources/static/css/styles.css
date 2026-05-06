@@ -570,3 +570,122 @@ select.input-error {
     font-size: 1rem;
   }
 }
+
+/* =====================================================================
+   Flight Detail Page
+   ===================================================================== */
+
+/* Back navigation link inside the header */
+.back-link {
+  color: #93c5fd;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-right: 1rem;
+  white-space: nowrap;
+}
+
+.back-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+/* Status / error messages shown before the detail card is visible */
+.status-message {
+  padding: 1.5rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.status-message-error {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* Wrapper for each named section within the detail card */
+.detail-section {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.detail-section h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1e3a5f;
+  margin-bottom: 1rem;
+}
+
+/* Definition list — two-column grid for label / value pairs */
+.flight-dl {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: 0.5rem 1rem;
+  font-size: 0.925rem;
+}
+
+.flight-dl dt {
+  color: #6b7280;
+  font-weight: 500;
+  align-self: start;
+  padding-top: 0.1rem;
+}
+
+.flight-dl dd {
+  color: #111827;
+  word-break: break-word;
+}
+
+/* Transition buttons strip */
+.transition-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.btn-transition {
+  background-color: #1d4ed8;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.btn-transition:hover {
+  background-color: #1e40af;
+}
+
+/* Terminal state message */
+.terminal-msg {
+  color: #6b7280;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Action buttons row below sections */
+#toggle-edit-btn,
+#delete-btn {
+  margin-right: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Responsive adjustments for detail page */
+@media (max-width: 600px) {
+  .flight-dl {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-dl dt {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+}
