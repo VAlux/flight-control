@@ -303,3 +303,26 @@
   - `MethodValidationPostProcessor` must be imported explicitly in `@WebMvcTest` slices because `@WebMvcTest` only bootstraps the web layer and does not auto-configure method-level bean validation. Adding it to `@Import` activates the AOP proxy that enforces `@Validated` constraints on controller methods.
   - The `shouldReturn400_whenSizeExceedsMaximum` test works correctly with this import — `GET /api/v1/flights?size=200` returns 400 with `application/problem+json` and `$.type` containing `validation-failed`.
 - **Tests:** 122 passing, 0 failures (`./mvnw test` — BUILD SUCCESS in ~6.4 s)
+
+---
+
+## 2026-05-07 — Increment 7: Integration Test
+
+- **What was completed:** `FlightLifecycleIntegrationTest` — a `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@AutoConfigureMockMvc` test class with 12 ordered test methods covering the complete flight lifecycle against a real H2 database. All 12 scenarios pass. Full suite is 134 tests, 0 failures.
+- **Interfaces/methods created:** None (test-only increment).
+- **Files created/modified:**
+  - `src/test/java/com/flightcontrol/integration/FlightLifecycleIntegrationTest.java` — new; 12 `@Test @Order(N)` methods sharing state via `static UUID` fields
+  - `context/PROGRESS.md` — this update
+  - `context/PLAN.md` — Increment 7 marked completed
+- **Decisions made:**
+  - `@TestMethodOrder(MethodOrderer.OrderAnnotation.class)` with individual `@Test @Order(N)` methods chosen over a single monolithic test for readability and targeted failure reporting.
+  - Shared flight IDs stored in `static UUID` fields (`createdFlightId`, `secondFlightId`) so ordered methods can reference the flight created in earlier steps.
+  - `MockMvc` used instead of `TestRestTemplate` — supports fluent `jsonPath` assertions and header assertions without deserialising into POJOs.
+  - `ObjectMapper` autowired for serialising `FlightRequest` to JSON strings, ensuring Jackson config (snake_case, UTC timestamps) matches what the controller expects.
+  - `@SpringBootTest` with `RANDOM_PORT` loads the full application context including `schema.sql`, all beans, and the embedded H2 datasource from `application.properties` — no test-specific overrides required.
+- **Tests:** 134 passing (12 integration + 22 controller + 34 service + 9 mapper + 44 state machine + 12 repository + 1 smoke), 0 failures (`./mvnw test` — BUILD SUCCESS in ~6.7 s)
+
+## 2026-05-07 — Code Review (Increment 7)
+- Quality: PASS (Critical: 0, High: 0, Medium: 4)
+- Coverage: GAPS FOUND — Step 3 (listFlights) sends no filter parameters; filter specification path is unexercised end-to-end; X-Request-ID not asserted on the Order 12 POST response
+- Recommendation: fix and re-review
